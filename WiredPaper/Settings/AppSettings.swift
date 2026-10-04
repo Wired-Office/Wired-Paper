@@ -53,7 +53,7 @@ final class AppSettings: ObservableObject {
         case checkSpellingWhileTyping, smartQuotes, smartDashes, autoLinkDetection
         case showRuler, showFormatBar, showStatusBar
         case authorName, automaticBackups, fixDateFieldsOnInsert, autoSave
-        case inlineSuggestions
+        case inlineSuggestions, checkForUpdates
     }
 
     private let defaults: UserDefaults
@@ -78,6 +78,8 @@ final class AppSettings: ObservableObject {
     @Published var autoSave: Bool { didSet { store(autoSave, .autoSave) } }
     /// Suggest how to continue a sentence (on-device model; Tab accepts).
     @Published var inlineSuggestions: Bool { didSet { store(inlineSuggestions, .inlineSuggestions) } }
+    /// Look for a newer release on GitHub at launch and once a day.
+    @Published var checkForUpdates: Bool { didSet { store(checkForUpdates, .checkForUpdates) } }
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -100,6 +102,7 @@ final class AppSettings: ObservableObject {
             Key.fixDateFieldsOnInsert.rawValue: false,
             Key.autoSave.rawValue: true,
             Key.inlineSuggestions.rawValue: true,
+            Key.checkForUpdates.rawValue: true,
         ])
 
         showTemplateChooserOnLaunch = defaults.bool(forKey: Key.showTemplateChooserOnLaunch.rawValue)
@@ -119,6 +122,7 @@ final class AppSettings: ObservableObject {
         fixDateFieldsOnInsert = defaults.bool(forKey: Key.fixDateFieldsOnInsert.rawValue)
         autoSave = defaults.bool(forKey: Key.autoSave.rawValue)
         inlineSuggestions = defaults.bool(forKey: Key.inlineSuggestions.rawValue)
+        checkForUpdates = defaults.bool(forKey: Key.checkForUpdates.rawValue)
     }
 
     var defaultPageSetup: PageSetup { .standard(defaultPaper) }

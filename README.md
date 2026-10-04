@@ -22,6 +22,7 @@ The project uses file-system-synchronized groups, so new source files placed und
 - **Inserts.** Images (scaled to fit the page), tables (Tab/Shift-Tab move between cells; Tab in the last cell adds a row; Format ▸ Table ▸ Table Properties for borders and merging), page breaks, horizontal lines and the date.
 - **Ruler.** Left, right and first-line indents plus tab stops for the current paragraph. Zero sits at the left margin.
 - **Writing suggestions.** After a short pause at the end of a paragraph, Apple's on-device language model (macOS 26+, Apple Intelligence) suggests how to continue the sentence in gray. Tab accepts, Option-Right Arrow accepts one word, Escape dismisses; typing the suggested letters keeps the rest. Text never leaves the Mac. Toggle in Settings ▸ Editing.
+- **Update notifications.** At launch and once a day, the app checks the latest GitHub release and, if it is newer, shows its release notes with a Download button (Remind Me Later / Skip This Version). Wired Paper ▸ Check for Updates… checks on demand; turn automatic checks off in Settings ▸ General.
 - **Find & Replace.** The native macOS find bar spans all pages, with incremental highlighting, case and whole-word options, Replace and Replace All.
 - **Documents.** Built on NSDocument, which provides autosave, versions, crash recovery, Open Recent, the edited indicator, Duplicate/Rename/Move and Revert.
 - **Formats.** `.paper` (native, default), `.wiredpaper` (native package), RTF, RTFD, DOCX, ODT, HTML and plain text for open and save; PDF export and printing match on-screen pagination.
@@ -44,7 +45,7 @@ WiredPaper/
   Templates/    Template model, content library, chooser window
   Settings/     AppSettings (UserDefaults) and the Settings window
 WiredPaperTests/ Codec round-trips, lists, tables, pagination, PDF, statistics
-Scripts/        generate-icon.swift, which renders the app icon
+Scripts/        generate-icon.swift (app icon), make-dmg.sh (release disk image)
 ```
 
 ### Key decisions

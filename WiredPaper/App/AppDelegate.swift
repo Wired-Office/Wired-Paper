@@ -16,6 +16,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSWindow.allowsAutomaticWindowTabbing = true
     }
 
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        if !Self.isRunningTests { UpdateChecker.shared.start() }
+    }
+
     func applicationShouldOpenUntitledFile(_ sender: NSApplication) -> Bool {
         if Self.isRunningTests { return false }
         guard AppSettings.shared.showTemplateChooserOnLaunch else { return true }
@@ -35,6 +39,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func showSettings(_ sender: Any?) {
         SettingsWindowController.shared.show()
+    }
+
+    @objc func checkForUpdates(_ sender: Any?) {
+        UpdateChecker.shared.check(userInitiated: true)
     }
 
     @objc func showAboutPanel(_ sender: Any?) {

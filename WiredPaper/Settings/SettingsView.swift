@@ -68,6 +68,12 @@ private struct GeneralSettings: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            Section("Updates") {
+                Toggle("Check for new versions automatically", isOn: $settings.checkForUpdates)
+                LabeledContent("Version \(AppVersion.current?.description ?? "")") {
+                    Button("Check Now") { UpdateChecker.shared.check(userInitiated: true) }
+                }
+            }
         }
         .formStyle(.grouped)
         .scrollDisabled(true)
