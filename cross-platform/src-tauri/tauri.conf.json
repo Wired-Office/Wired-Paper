@@ -1,0 +1,66 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Wired Paper",
+  "mainBinaryName": "wired-paper",
+  "version": "1.3.0",
+  "identifier": "com.wiredoffice.wiredpaper",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Wired Paper",
+        "width": 1200,
+        "height": 880,
+        "minWidth": 760,
+        "minHeight": 480,
+        "dragDropEnabled": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost https://api.github.com; font-src 'self' data:"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis", "appimage", "deb"],
+    "category": "Productivity",
+    "shortDescription": "A calm, capable word processor",
+    "longDescription": "Wired Paper is a word processor with real page layout, rich formatting, tables and pictures, and private writing suggestions from a local AI model. Documents are .paper files that also open in Wired Paper for Mac.",
+    "publisher": "Wired Office",
+    "copyright": "© Wired Office",
+    "homepage": "https://github.com/Wired-Office/Wired-Paper",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "fileAssociations": [
+      {
+        "ext": ["paper"],
+        "name": "Wired Paper Document",
+        "description": "Wired Paper Document",
+        "mimeType": "application/vnd.wiredpaper.paper",
+        "role": "Editor"
+      }
+    ],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "displayLanguageSelector": false
+      }
+    },
+    "linux": {
+      "deb": {
+        "section": "editors"
+      }
+    }
+  }
+}

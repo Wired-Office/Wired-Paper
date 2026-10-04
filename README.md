@@ -1,8 +1,26 @@
 # Wired Paper
 
-A native macOS word processor with a familiar document workflow, written in Swift with AppKit/TextKit for the editor and SwiftUI for the surrounding interface. No third-party dependencies.
+A word processor with a familiar document workflow for **macOS, Windows and Linux**.
 
-## Building
+- **macOS:** a native app written in Swift, with AppKit/TextKit for the editor and SwiftUI for the surrounding interface. No third-party dependencies.
+- **Windows and Linux:** a desktop app built with [Tauri](https://tauri.app) (Rust plus a web-based editor) in [`cross-platform/`](cross-platform/).
+
+Both read and write the same **`.paper`** files, so documents move freely between computers.
+
+## Download
+
+Get the latest version from [Releases](https://github.com/Wired-Office/Wired-Paper/releases/latest):
+
+| Platform | File |
+| --- | --- |
+| macOS 14+ (Apple silicon and Intel) | `Wired-Paper-<version>.dmg` |
+| Windows 10/11 (x64) | `Wired-Paper-<version>-windows-x64-setup.exe` |
+| Linux (x86_64), any distribution | `Wired-Paper-<version>-linux-x86_64.AppImage` |
+| Debian, Ubuntu, Mint… | `Wired-Paper-<version>-linux-amd64.deb` |
+
+The builds aren't signed by Apple or Microsoft yet, so on first launch macOS asks you to confirm (right-click ▸ Open), and Windows SmartScreen asks you to confirm (More info ▸ Run anyway). For the AppImage, make the file executable (`chmod +x`) and run it.
+
+## Building the Mac app
 
 Open `WiredPaper.xcodeproj` in Xcode (26 or later) and run the **WiredPaper** scheme. It requires macOS 14 or later.
 
@@ -14,6 +32,29 @@ xcodebuild -project WiredPaper.xcodeproj -scheme WiredPaper test
 ```
 
 The project uses file-system-synchronized groups, so new source files placed under `WiredPaper/` are picked up automatically.
+
+## Building the Windows and Linux app
+
+Needs Node.js 20+ and Rust (stable). On Linux, also install the WebKitGTK development packages ([Tauri prerequisites](https://tauri.app/start/prerequisites/)).
+
+```bash
+cd cross-platform
+npm install
+npm test            # format and editor tests
+npm run tauri dev   # run the desktop app
+npm run dev         # or just the editor, in a browser at http://localhost:1420
+npm run tauri build # installers in src-tauri/target/release/bundle
+```
+
+Release installers are built by GitHub Actions ([`windows-linux.yml`](.github/workflows/windows-linux.yml)): create the release, then run the workflow with the release tag and it attaches the `.exe`, `.AppImage` and `.deb`. Build the Mac `.dmg` with `Scripts/make-dmg.sh`.
+
+### What the Windows and Linux app does
+
+Paginated page view, fonts, sizes, bold/italic/underline/strikethrough, super- and subscript, text color and highlight, alignment, bulleted and numbered lists, named styles (Title, Headings, Quote, Code…), links, pictures (insert, paste, drag in, resize), tables (rows, columns, merging, header row), page breaks, Find & Replace, page setup, printing and PDF (through the system's print-to-PDF printer), word count and zoom. It opens and saves `.paper`, DOCX, RTF, HTML and plain text. It also shows update notifications and writing suggestions (see below).
+
+Comments, tracked changes, footnotes and the other Mac-only features in a `.paper` file are shown as plain text and removed if the document is saved on Windows or Linux; the app says so when it opens such a file.
+
+**Writing suggestions** use a local model through [Ollama](https://ollama.com): install Ollama, run `ollama pull llama3.2`, and suggestions appear while you write (Tab accepts, Ctrl+→ accepts one word, Esc dismisses). The app only connects to Ollama on the same computer, so your text never leaves it. Choose the model in Settings.
 
 ## Features
 
@@ -44,7 +85,9 @@ WiredPaper/
   UI/           SwiftUI format bar, status bar, color palettes, sheets, theme
   Templates/    Template model, content library, chooser window
   Settings/     AppSettings (UserDefaults) and the Settings window
-WiredPaperTests/ Codec round-trips, lists, tables, pagination, PDF, statistics
+WiredPaperTests/ Codec round-trips, lists, tables, pagination, PDF, statistics,
+                cross-platform .paper compatibility
+cross-platform/ Windows & Linux app (Tauri): src/ editor & formats, src-tauri/ Rust backend
 Scripts/        generate-icon.swift (app icon), make-dmg.sh (release disk image)
 ```
 

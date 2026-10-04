@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Wired Paper</title>
+  </head>
+  <body>
+    <div id="app">
+      <nav id="menubar" role="menubar" aria-label="Menu"></nav>
+      <div id="toolbar" role="toolbar" aria-label="Formatting"></div>
+      <div id="findbar" hidden>
+        <input id="find-input" type="search" placeholder="Find" aria-label="Find" spellcheck="false" />
+        <span id="find-count" aria-live="polite"></span>
+        <button data-find="prev" title="Previous (Shift+Enter)" aria-label="Previous match">‹</button>
+        <button data-find="next" title="Next (Enter)" aria-label="Next match">›</button>
+        <label class="check"><input id="find-case" type="checkbox" /> Match case</label>
+        <span class="find-replace">
+          <input id="replace-input" type="text" placeholder="Replace with" aria-label="Replace with" spellcheck="false" />
+          <button data-find="replace">Replace</button>
+          <button data-find="replace-all">Replace All</button>
+        </span>
+        <button data-find="close" class="close" title="Close (Esc)" aria-label="Close find bar">×</button>
+      </div>
+      <div id="banner" hidden role="status"></div>
+      <main id="canvas">
+        <div id="sheet-frame">
+          <div id="sheet">
+            <div id="page-markers" aria-hidden="true"></div>
+            <div id="editor"></div>
+          </div>
+        </div>
+      </main>
+      <footer id="statusbar">
+        <span id="status-page"></span>
+        <span id="status-words"></span>
+        <span id="status-ai" class="status-ai" title=""></span>
+        <span class="spacer"></span>
+        <button id="zoom-out" aria-label="Zoom out">−</button>
+        <input id="zoom" type="range" min="50" max="200" step="10" value="100" aria-label="Zoom" />
+        <button id="zoom-in" aria-label="Zoom in">+</button>
+        <button id="zoom-value" title="Actual size">100%</button>
+      </footer>
+    </div>
+    <dialog id="dialog"></dialog>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
