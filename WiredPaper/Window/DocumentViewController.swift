@@ -293,6 +293,51 @@ final class DocumentViewController: NSViewController, NSMenuItemValidation {
         ExportController.beginExport(for: document, in: window)
     }
 
+    @objc func saveAsTemplate(_ sender: Any?) {
+        guard let window = view.window, let document else { return }
+        let alert = NSAlert()
+        alert.messageText = "Save as Template"
+        alert.informativeText = "The template keeps this document’s text, pictures, styles and page setup. It appears under My Templates in File ▸ New from Template…."
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 280, height: 24))
+        field.placeholderString = "Template name"
+        field.stringValue = document.displayName.map { ($0 as NSString).deletingPathExtension } ?? ""
+        alert.accessoryView = field
+        alert.addButton(withTitle: "Save")
+        alert.addButton(withTitle: "Cancel")
+        alert.window.initialFirstResponder = field
+        alert.beginSheetModal(for: window) { [weak self] response in
+            guard response == .alertFirstButtonReturn else { return }
+            self?.saveTemplate(named: field.stringValue, in: window, document: document)
+        }
+    }
+
+    private func saveTemplate(named input: String, in window: NSWindow, document: WiredPaperDocument) {
+        let store = UserTemplateStore.shared
+        guard let name = UserTemplateStore.sanitizedName(input) else {
+            NSSound.beep()
+            return
+        }
+        let write = {
+            do {
+                try store.save(try document.paperFileWrapper(), name: name)
+            } catch {
+                document.presentError(error, modalFor: window, delegate: nil, didPresent: nil, contextInfo: nil)
+            }
+        }
+        guard store.template(named: name) != nil else { return write() }
+        // Let the first sheet finish closing before showing the next one.
+        DispatchQueue.main.async {
+            let confirm = NSAlert()
+            confirm.messageText = "Replace the template “\(name)”?"
+            confirm.informativeText = "A template with this name already exists."
+            confirm.addButton(withTitle: "Replace")
+            confirm.addButton(withTitle: "Cancel")
+            confirm.beginSheetModal(for: window) { response in
+                if response == .alertFirstButtonReturn { write() }
+            }
+        }
+    }
+
     @objc func showDocumentSetup(_ sender: Any?) {
         guard let window = view.window, let document else { return }
         let unit = AppSettings.shared.measurementUnit

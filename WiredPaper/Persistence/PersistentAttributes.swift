@@ -34,6 +34,8 @@ extension NSAttributedString.Key {
     static let wpIndexEntry = NSAttributedString.Key("WPIndexEntry")
     /// Alternative text for images.
     static let wpAltText = NSAttributedString.Key("WPAltText")
+    /// Display size of a resized image, in points: "<width>x<height>".
+    static let wpImageSize = NSAttributedString.Key("WPImageSize")
     /// Marks generated content (table of contents, bibliography, index…): "toc", "bibliography"…
     static let wpGenerated = NSAttributedString.Key("WPGenerated")
 }
@@ -77,7 +79,7 @@ enum PersistentAttributes {
     static let keys: [NSAttributedString.Key] = [
         .wpParagraphStyle, .wpHidden, .wpComment, .wpRevision, .wpBookmark, .wpObject, .wpTabLeader,
         .wpParaFlags, .wpCharFlags, .wpCitation, .wpCaption, .wpMergeField, .wpFormField, .wpBreakKind,
-        .wpIndexEntry, .wpAltText, .wpGenerated,
+        .wpIndexEntry, .wpAltText, .wpGenerated, .wpImageSize,
     ]
 
     static func collect(from text: NSAttributedString) -> [String: [AttributeRun]] {

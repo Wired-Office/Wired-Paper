@@ -81,10 +81,25 @@ final class HorizontalRuleCell: NSTextAttachmentCell {
 
 // MARK: - Image fitting
 
-/// Image cell scaled to fit the page. Records the limits it was fitted to so
-/// normalization is idempotent.
+/// Image cell scaled to fit the page, or to the size the user dragged it to.
+/// Records the limits and size it was fitted to so normalization is idempotent.
 final class FittedImageCell: NSTextAttachmentCell {
     var fittedTo: CGSize = .zero
+    var requested: CGSize?
+}
+
+/// The `.wpImageSize` value: an image's display size in points.
+enum ImageSize {
+    static func decode(_ value: Any?) -> CGSize? {
+        guard let string = value as? String else { return nil }
+        let parts = string.split(separator: "x").compactMap { Double($0) }
+        guard parts.count == 2, parts[0] > 0, parts[1] > 0 else { return nil }
+        return CGSize(width: parts[0], height: parts[1])
+    }
+
+    static func encode(_ size: CGSize) -> String {
+        "\(Int(size.width.rounded()))x\(Int(size.height.rounded()))"
+    }
 }
 
 enum AttachmentNormalizer {
@@ -99,34 +114,36 @@ enum AttachmentNormalizer {
                 ObjectCells.install(for: attachment, object: object)
                 if attachment.attachmentCell is LiveTextCell || attachment.attachmentCell is ObjectImageCell { return }
             }
-            normalize(attachment, maxSize: maxSize)
+            normalize(attachment, maxSize: maxSize, requestedSize: ImageSize.decode(storage.attribute(.wpImageSize, at: run.location, effectiveRange: nil)))
         }
     }
 
-    static func normalize(_ attachment: NSTextAttachment, maxSize: CGSize) {
+    /// `requestedSize` is the size the user resized the image to, if any.
+    static func normalize(_ attachment: NSTextAttachment, maxSize: CGSize, requestedSize: CGSize? = nil) {
         if HorizontalRule.isRule(attachment) {
             if !(attachment.attachmentCell is HorizontalRuleCell) {
                 attachment.attachmentCell = HorizontalRuleCell()
             }
             return
         }
-        if let fitted = attachment.attachmentCell as? FittedImageCell, fitted.fittedTo == maxSize { return }
+        if let fitted = attachment.attachmentCell as? FittedImageCell, fitted.fittedTo == maxSize, fitted.requested == requestedSize { return }
         guard let image = sourceImage(for: attachment) else { return }
 
-        let natural = image.size
+        let natural = requestedSize ?? image.size
         guard natural.width > 0, natural.height > 0 else { return }
         let scale = min(1, maxSize.width / natural.width, maxSize.height / natural.height)
-        let target = NSSize(width: floor(natural.width * scale), height: floor(natural.height * scale))
+        let target = NSSize(width: max(floor(natural.width * scale), 1), height: max(floor(natural.height * scale), 1))
 
-        guard scale < 1 || attachment.attachmentCell is FittedImageCell else { return }
+        guard scale < 1 || requestedSize != nil || attachment.attachmentCell is FittedImageCell else { return }
         guard let scaled = image.copy() as? NSImage else { return }
         scaled.size = target
         let cell = FittedImageCell(imageCell: scaled)
         cell.fittedTo = maxSize
+        cell.requested = requestedSize
         attachment.attachmentCell = cell
     }
 
-    private static func sourceImage(for attachment: NSTextAttachment) -> NSImage? {
+    static func sourceImage(for attachment: NSTextAttachment) -> NSImage? {
         if let wrapper = attachment.fileWrapper, wrapper.isRegularFile {
             let name = wrapper.preferredFilename ?? wrapper.filename ?? ""
             let ext = (name as NSString).pathExtension

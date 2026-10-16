@@ -80,7 +80,12 @@ final class OnDeviceCompletionProvider: TextCompletionProvider {
             prompt += "\n\nText after the cursor (do not repeat it):\n<<<\(context.after)>>>"
         }
         prompt += "\n\nContinuation:"
+        // The macOS 27 SDK renamed `sampling:`; keep building with the 26 SDK.
+        #if canImport(FoundationModels, _version: 2.0)
         let options = GenerationOptions(samplingMode: .greedy, maximumResponseTokens: 40)
+        #else
+        let options = GenerationOptions(sampling: .greedy, maximumResponseTokens: 40)
+        #endif
         return try await session.respond(to: prompt, options: options).content
     }
 }

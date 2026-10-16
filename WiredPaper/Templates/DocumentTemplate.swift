@@ -1,12 +1,16 @@
 import AppKit
 
-/// A starting point for a new document. Content is generated in code from the
-/// style catalog, so templates always match the user's current default font.
+/// A starting point for a new document. Built-in templates generate their
+/// content in code from the style catalog, so they always match the user's
+/// current default font. User templates are `.paper` files saved by
+/// File ▸ Save as Template… (see `UserTemplateStore`).
 struct DocumentTemplate: Identifiable, Hashable {
     let id: String
     let name: String
     let summary: String
     let symbol: String
+    /// The `.paper` file of a user template; nil for built-in templates.
+    let fileURL: URL?
     private let builder: (TemplateWriter) -> Void
 
     init(id: String, name: String, summary: String, symbol: String, builder: @escaping (TemplateWriter) -> Void) {
@@ -14,10 +18,35 @@ struct DocumentTemplate: Identifiable, Hashable {
         self.name = name
         self.summary = summary
         self.symbol = symbol
+        self.fileURL = nil
         self.builder = builder
     }
 
+    /// A user template stored as a `.paper` file.
+    init(userTemplateAt url: URL) {
+        let name = url.deletingPathExtension().lastPathComponent
+        self.id = "user:" + name
+        self.name = name
+        let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+        self.summary = modified.map { "Saved " + $0.formatted(date: .abbreviated, time: .omitted) } ?? "My template"
+        self.symbol = "person.crop.square"
+        self.fileURL = url
+        self.builder = { _ in }
+    }
+
+    var isUserTemplate: Bool { fileURL != nil }
+
+    /// Everything stored in a user template: text, images, styles and page setup.
+    func readContents() throws -> DocumentContents? {
+        guard let fileURL else { return nil }
+        let wrapper = try FileWrapper(url: fileURL, options: .immediate)
+        return try PaperFileCodec().read(from: wrapper, defaultAttributes: StyleCatalog.attributes(for: .normal))
+    }
+
     func makeContent(_ pageSetup: PageSetup) -> NSAttributedString {
+        if isUserTemplate {
+            return (try? readContents())?.text ?? NSAttributedString()
+        }
         let writer = TemplateWriter(contentWidth: pageSetup.contentSize.width)
         builder(writer)
         return writer.output

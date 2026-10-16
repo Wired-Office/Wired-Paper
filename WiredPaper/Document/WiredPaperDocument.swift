@@ -155,12 +155,33 @@ final class WiredPaperDocument: NSDocument, ObservableObject {
     }
 
     func load(template: DocumentTemplate) {
+        if template.isUserTemplate {
+            do {
+                if var contents = try template.readContents() {
+                    // A fresh document, not a copy of the one the template was saved from.
+                    var metadata = contents.metadata ?? DocumentMetadata()
+                    metadata.documentID = UUID().uuidString
+                    metadata.created = Date()
+                    metadata.templateID = template.id
+                    contents.metadata = metadata
+                    apply(contents)
+                }
+            } catch {
+                presentError(error)
+            }
+            return
+        }
         textStorage.setAttributedString(template.makeContent(pageSetup))
         AttachmentNormalizer.normalize(textStorage, maxSize: geometry.maxAttachmentSize)
         metadata.templateID = template.id
     }
 
     // MARK: - Writing
+
+    /// The document as a `.paper` file, whatever format it is saved in (File ▸ Save as Template…).
+    func paperFileWrapper() throws -> FileWrapper {
+        try fileWrapper(ofType: DocumentFormat.paper.typeIdentifier)
+    }
 
     override func fileWrapper(ofType typeName: String) throws -> FileWrapper {
         guard let format = DocumentFormat(typeName: typeName) else {

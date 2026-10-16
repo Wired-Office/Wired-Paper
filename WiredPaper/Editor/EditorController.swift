@@ -849,7 +849,7 @@ extension EditorController: NSTextViewDelegate {
     /// Typed text must not inherit objects, anchors or tracked-change marks from its neighbors.
     func textView(_ textView: NSTextView, shouldChangeTypingAttributes oldTypingAttributes: [String: Any] = [:], toAttributes newTypingAttributes: [NSAttributedString.Key: Any] = [:]) -> [NSAttributedString.Key: Any] {
         var attributes = newTypingAttributes
-        for key in [NSAttributedString.Key.wpObject, .wpComment, .wpBookmark, .wpRevision, .wpAltText, .wpGenerated, .wpMergeField, .wpCitation, .wpIndexEntry] {
+        for key in [NSAttributedString.Key.wpObject, .wpComment, .wpBookmark, .wpRevision, .wpAltText, .wpImageSize, .wpGenerated, .wpMergeField, .wpCitation, .wpIndexEntry] {
             attributes.removeValue(forKey: key)
         }
         return attributes

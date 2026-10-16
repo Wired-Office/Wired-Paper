@@ -60,14 +60,14 @@ Comments, tracked changes, footnotes and the other Mac-only features in a `.pape
 
 - **Real paginated editing.** One `NSLayoutManager` flows the text through one text container per page. Pages are added and removed as text flows, and page breaks move text to the next page.
 - **Formatting.** Fonts, sizes, bold/italic/underline/strikethrough, text color, highlight, alignment, indentation, line and paragraph spacing, bulleted and numbered lists, named styles (Title, Headings, Quote…), links, superscript/subscript and clear formatting.
-- **Inserts.** Images (scaled to fit the page), tables (Tab/Shift-Tab move between cells; Tab in the last cell adds a row; Format ▸ Table ▸ Table Properties for borders and merging), page breaks, horizontal lines and the date.
+- **Inserts.** Images (scaled to fit the page; drag the handles to resize, drag the picture to move it within the text), tables (Tab/Shift-Tab move between cells; Tab in the last cell adds a row; Format ▸ Table ▸ Table Properties for borders and merging), page breaks, horizontal lines and the date.
 - **Ruler.** Left, right and first-line indents plus tab stops for the current paragraph. Zero sits at the left margin.
 - **Writing suggestions.** After a short pause at the end of a paragraph, Apple's on-device language model (macOS 26+, Apple Intelligence) suggests how to continue the sentence in gray. Tab accepts, Option-Right Arrow accepts one word, Escape dismisses; typing the suggested letters keeps the rest. Text never leaves the Mac. Toggle in Settings ▸ Editing.
 - **Update notifications.** At launch and once a day, the app checks the latest GitHub release and, if it is newer, shows its release notes with a Download button (Remind Me Later / Skip This Version). Wired Paper ▸ Check for Updates… checks on demand; turn automatic checks off in Settings ▸ General.
 - **Find & Replace.** The native macOS find bar spans all pages, with incremental highlighting, case and whole-word options, Replace and Replace All.
 - **Documents.** Built on NSDocument, which provides autosave, versions, crash recovery, Open Recent, the edited indicator, Duplicate/Rename/Move and Revert.
 - **Formats.** `.paper` (native, default), `.wiredpaper` (native package), RTF, RTFD, DOCX, ODT, HTML and plain text for open and save; PDF export and printing match on-screen pagination.
-- **Templates.** Blank, Letter, Report, Resume and Notes, in a chooser with live previews and a recent-documents list.
+- **Templates.** Blank, Letter, Report, Resume and Notes, in a chooser with live previews and a recent-documents list. File ▸ Save as Template… adds your own documents as templates (rename or delete them from the chooser).
 - **Chrome.** Toolbar, format bar, status bar (page, words, characters, zoom slider), light and dark mode (pages stay paper-white), and Settings.
 
 ## Architecture

@@ -74,6 +74,7 @@ enum MainMenuBuilder {
         menu.addItem(.separator())
         menu.addItem(item("Export…", #selector(DocumentViewController.exportDocument(_:)), "e", [.command, .shift]))
         menu.addItem(item("Export as PDF…", #selector(NSDocument.saveToPDF(_:))))
+        menu.addItem(item("Save as Template…", #selector(DocumentViewController.saveAsTemplate(_:))))
         menu.addItem(.separator())
         menu.addItem(item("Properties…", #selector(DocumentViewController.showDocumentProperties(_:))))
         menu.addItem(.separator())

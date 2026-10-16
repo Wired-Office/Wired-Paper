@@ -146,13 +146,14 @@ extension EditorController {
         let wrapper = FileWrapper(regularFileWithContents: data)
         wrapper.preferredFilename = name + (jpegQuality == nil ? ".png" : ".jpg")
         let attachment = NSTextAttachment(fileWrapper: wrapper)
-        if let displaySize {
-            let scaled = image.copy() as! NSImage
-            scaled.size = displaySize
-            attachment.attachmentCell = NSTextAttachmentCell(imageCell: scaled)
-        }
-        AttachmentNormalizer.normalize(attachment, maxSize: geometry.maxAttachmentSize)
         var attributes = textStorage.attributes(at: location, effectiveRange: nil)
+        // A resized picture keeps its width; the height follows the new picture (rotated, cropped…).
+        var requested = displaySize
+        if requested == nil, let size = ImageSize.decode(attributes[.wpImageSize]), image.size.width > 0 {
+            requested = CGSize(width: size.width, height: (size.width * image.size.height / image.size.width).rounded())
+        }
+        attributes[.wpImageSize] = requested.map(ImageSize.encode)
+        AttachmentNormalizer.normalize(attachment, maxSize: geometry.maxAttachmentSize, requestedSize: requested)
         attributes[.attachment] = attachment
         let content = NSAttributedString(string: String(Character(UnicodeScalar(NSTextAttachment.character)!)), attributes: attributes)
         let range = NSRange(location: location, length: 1)
@@ -161,6 +162,65 @@ extension EditorController {
         textView.didChangeText()
         textView.undoManager?.setActionName(actionName)
         textView.setSelectedRange(NSRange(location: location, length: 1))
+    }
+
+    /// Whether the character at `location` is a picture (not an object or a rule).
+    func isImage(at location: Int) -> Bool {
+        guard location >= 0, location < textStorage.length,
+              textStorage.attribute(.wpObject, at: location, effectiveRange: nil) == nil,
+              let attachment = textStorage.attribute(.attachment, at: location, effectiveRange: nil) as? NSTextAttachment,
+              !HorizontalRule.isRule(attachment) else { return false }
+        return AttachmentNormalizer.sourceImage(for: attachment) != nil
+    }
+
+    /// Sets the display size of the picture at `location`; nil restores its own size.
+    func setImageSize(_ size: CGSize?, at location: Int) {
+        guard isImage(at: location),
+              let old = textStorage.attribute(.attachment, at: location, effectiveRange: nil) as? NSTextAttachment,
+              let wrapper = old.fileWrapper else { NSSound.beep(); return }
+        let requested = size.map { CGSize(width: max($0.width.rounded(), 8), height: max($0.height.rounded(), 8)) }
+        var attributes = textStorage.attributes(at: location, effectiveRange: nil)
+        guard ImageSize.decode(attributes[.wpImageSize]) != requested else { return }
+        // A new attachment, so undo brings back the old one with its old cell.
+        let attachment = NSTextAttachment(fileWrapper: wrapper)
+        AttachmentNormalizer.normalize(attachment, maxSize: geometry.maxAttachmentSize, requestedSize: requested)
+        attributes[.attachment] = attachment
+        attributes[.wpImageSize] = requested.map(ImageSize.encode)
+        let content = NSAttributedString(string: String(Character(UnicodeScalar(NSTextAttachment.character)!)), attributes: attributes)
+        let range = NSRange(location: location, length: 1)
+        let textView = self.textView(containingCharacterAt: location).textView
+        guard textView.shouldChangeText(in: range, replacementString: content.string) else { return }
+        textStorage.replaceCharacters(in: range, with: content)
+        textView.didChangeText()
+        textView.undoManager?.setActionName(size == nil ? "Reset Picture Size" : "Resize Picture")
+        textView.setSelectedRange(range)
+    }
+
+    /// Moves the picture at `location` so it sits before the character now at `target`.
+    func moveImage(from location: Int, to target: Int) {
+        guard isImage(at: location), target >= 0, target <= textStorage.length,
+              target != location, target != location + 1 else { return }
+        let piece = textStorage.attributedSubstring(from: NSRange(location: location, length: 1))
+        let textView = self.textView
+        let undoManager = textView.undoManager
+        undoManager?.beginUndoGrouping()
+        defer {
+            undoManager?.endUndoGrouping()
+            undoManager?.setActionName("Move Picture")
+        }
+        let lengthBefore = textStorage.length
+        let source = NSRange(location: location, length: 1)
+        guard textView.shouldChangeText(in: source, replacementString: "") else { return }
+        textStorage.replaceCharacters(in: source, with: "")
+        textView.didChangeText()
+        // With Track Changes on, the original stays (marked deleted) and a copy is inserted.
+        let removed = textStorage.length < lengthBefore
+        let insertion = removed && target > location ? target - 1 : target
+        let destination = NSRange(location: min(insertion, textStorage.length), length: 0)
+        guard textView.shouldChangeText(in: destination, replacementString: piece.string) else { return }
+        textStorage.replaceCharacters(in: destination, with: piece)
+        textView.didChangeText()
+        textView.setSelectedRange(NSRange(location: destination.location, length: 1))
     }
 
     func transformSelectedImage(_ actionName: String, _ transform: (NSImage) -> NSImage?) {

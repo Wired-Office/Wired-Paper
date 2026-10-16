@@ -204,7 +204,7 @@ extension DocumentViewController {
     }
 
     @objc func setCellAlignmentFromMenu(_ sender: NSMenuItem) {
-        editor.setCellVerticalAlignment(NSTextBlock.VerticalAlignment(rawValue: sender.tag) ?? .topAlignment)
+        editor.setCellVerticalAlignment(NSTextBlock.VerticalAlignment(rawValue: numericCast(sender.tag)) ?? .topAlignment)
     }
 
     @objc func insertTableFormulaPrompt(_ sender: Any?) {

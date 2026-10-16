@@ -1,4 +1,5 @@
 import AppKit
+import UniformTypeIdentifiers
 
 /// The title bar, laid out like Word's: AutoSave, Home, Save, Undo, Redo,
 /// Print and More on the left; the document title in the middle; Comments,
@@ -244,21 +245,36 @@ final class DocumentToolbarController: NSObject, NSToolbarDelegate, NSSharingSer
 
     // MARK: Share
 
+    /// AppKit asks for the items when the item is created and on every toolbar
+    /// validation, so this stays cheap: saving and PDF rendering wait until the
+    /// user picks a service.
     func items(for pickerToolbarItem: NSSharingServicePickerToolbarItem) -> [Any] {
         guard let document = contentController?.document else { return [] }
-        if let url = document.fileURL {
-            if document.isDocumentEdited { document.save(nil) }
-            return [url]
-        }
-        // Unsaved documents are shared as a PDF.
+        if let url = document.fileURL { return [url] }
+        // Unsaved documents are shared as a PDF, rendered when a service asks for it.
         let name = (document.displayName as NSString).deletingPathExtension
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(name).pdf")
-        do {
-            try PDFExporter.export(document, to: url)
-            return [url]
-        } catch {
-            return [document.textStorage.string]
+        let provider = NSItemProvider()
+        provider.suggestedName = name
+        provider.registerFileRepresentation(forTypeIdentifier: UTType.pdf.identifier, fileOptions: [], visibility: .all) { [weak document] completion in
+            DispatchQueue.main.async {
+                guard let document else { return completion(nil, false, CocoaError(.fileNoSuchFile)) }
+                let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(name).pdf")
+                do {
+                    try PDFExporter.export(document, to: url)
+                    completion(url, false, nil)
+                } catch {
+                    completion(nil, false, error)
+                }
+            }
+            return nil
         }
+        return [provider]
+    }
+
+    func sharingServicePicker(_ sharingServicePicker: NSSharingServicePicker, didChoose service: NSSharingService?) {
+        // Share the current text, not the last saved version.
+        guard service != nil, let document = contentController?.document, document.fileURL != nil, document.isDocumentEdited else { return }
+        document.save(nil)
     }
 
     // MARK: Search

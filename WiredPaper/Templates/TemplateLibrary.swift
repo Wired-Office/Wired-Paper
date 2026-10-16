@@ -130,12 +130,119 @@ enum TemplateThumbnails {
     private static var cache: [String: NSImage] = [:]
 
     static func image(for template: DocumentTemplate, width: CGFloat = 150) -> NSImage {
-        let key = "\(template.id)-\(Int(width))"
+        let key = "\(template.id)-\(template.summary)-\(Int(width))"
         if let cached = cache[key] { return cached }
-        let setup = AppSettings.shared.defaultPageSetup
-        let view = PrintPagesView(text: template.makeContent(setup), pageSetup: setup, maxPages: 1)
+        let view: PrintPagesView
+        if template.isUserTemplate, let contents = try? template.readContents() {
+            let setup = contents.pageSetup.flatMap { $0.isValid ? $0 : nil } ?? AppSettings.shared.defaultPageSetup
+            var configuration = PrintConfiguration(text: contents.text, pageSetup: setup)
+            if let metadata = contents.metadata {
+                configuration.geometry = PageGeometry(setup: setup, decoration: metadata.decoration)
+                configuration.decoration = metadata.decoration
+                configuration.headerFooter = metadata.headerFooter
+            }
+            view = PrintPagesView(configuration: configuration, maxPages: 1)
+        } else {
+            let setup = AppSettings.shared.defaultPageSetup
+            view = PrintPagesView(text: template.makeContent(setup), pageSetup: setup, maxPages: 1)
+        }
         let image = view.firstPageImage(width: width)
         cache[key] = image
         return image
+    }
+
+    static func invalidate(_ template: DocumentTemplate) {
+        cache = cache.filter { !$0.key.hasPrefix(template.id + "-") }
+    }
+}
+
+/// Templates the user saved with File ▸ Save as Template…. Each one is a
+/// `.paper` file in ~/Library/Application Support/Wired Paper/Templates, named
+/// after the template, so it keeps text, images, styles and page setup.
+final class UserTemplateStore: ObservableObject {
+    static let shared = UserTemplateStore()
+
+    @Published private(set) var templates: [DocumentTemplate] = []
+
+    /// Overridable so tests can use a scratch folder.
+    var directory: URL {
+        didSet { reload() }
+    }
+
+    init(directory: URL = BackupManager.supportDirectory.appendingPathComponent("Templates", isDirectory: true)) {
+        self.directory = directory
+        reload()
+    }
+
+    func reload() {
+        let urls = (try? FileManager.default.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: [.contentModificationDateKey],
+            options: [.skipsHiddenFiles]
+        )) ?? []
+        templates = urls
+            .filter { $0.pathExtension == DocumentFormat.paper.fileExtension }
+            .map(DocumentTemplate.init(userTemplateAt:))
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+
+    /// Turns user input into a usable file name, or nil if nothing is left.
+    static func sanitizedName(_ name: String) -> String? {
+        let cleaned = name
+            .replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: ":", with: "-")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "."))
+        return cleaned.isEmpty ? nil : String(cleaned.prefix(120))
+    }
+
+    func url(forName name: String) -> URL {
+        directory.appendingPathComponent(name).appendingPathExtension(DocumentFormat.paper.fileExtension)
+    }
+
+    func template(named name: String) -> DocumentTemplate? {
+        templates.first { $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame }
+    }
+
+    /// Saves (or replaces) a template from a `.paper` file wrapper.
+    @discardableResult
+    func save(_ paperFile: FileWrapper, name: String) throws -> DocumentTemplate {
+        guard let name = Self.sanitizedName(name) else { throw CocoaError(.fileWriteInvalidFileName) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        if let existing = template(named: name), let url = existing.fileURL {
+            TemplateThumbnails.invalidate(existing)
+            try? FileManager.default.removeItem(at: url)
+        }
+        let url = url(forName: name)
+        try paperFile.write(to: url, options: .atomic, originalContentsURL: nil)
+        reload()
+        return template(named: name) ?? DocumentTemplate(userTemplateAt: url)
+    }
+
+    @discardableResult
+    func rename(_ template: DocumentTemplate, to newName: String) throws -> DocumentTemplate {
+        guard let source = template.fileURL else { return template }
+        guard let name = Self.sanitizedName(newName) else { throw CocoaError(.fileWriteInvalidFileName) }
+        if name == template.name { return template }
+        if let other = self.template(named: name), other != template {
+            throw CocoaError(.fileWriteFileExists, userInfo: [
+                NSLocalizedDescriptionKey: "A template named “\(name)” already exists.",
+            ])
+        }
+        let destination = url(forName: name)
+        // A case-only rename on a case-insensitive volume needs a detour.
+        let temporary = directory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.moveItem(at: source, to: temporary)
+        try FileManager.default.moveItem(at: temporary, to: destination)
+        TemplateThumbnails.invalidate(template)
+        reload()
+        return self.template(named: name) ?? DocumentTemplate(userTemplateAt: destination)
+    }
+
+    func delete(_ template: DocumentTemplate) throws {
+        guard let url = template.fileURL else { return }
+        try FileManager.default.trashItem(at: url, resultingItemURL: nil)
+        TemplateThumbnails.invalidate(template)
+        reload()
     }
 }

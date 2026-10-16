@@ -56,6 +56,11 @@ struct TemplateChooserView: View {
     let onCancel: () -> Void
 
     @State private var selection: DocumentTemplate = TemplateLibrary.blank
+    @ObservedObject private var userTemplates = UserTemplateStore.shared
+    @State private var renaming: DocumentTemplate?
+    @State private var newName = ""
+    @State private var deleting: DocumentTemplate?
+    @State private var errorMessage: String?
     private let recents = Array(NSDocumentController.shared.recentDocumentURLs.prefix(8))
 
     var body: some View {
@@ -68,11 +73,10 @@ struct TemplateChooserView: View {
 
             VStack(spacing: 0) {
                 ScrollView {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 150, maximum: 170), spacing: 22)], spacing: 22) {
-                        ForEach(TemplateLibrary.all) { template in
-                            TemplateCard(template: template, isSelected: template == selection)
-                                .onTapGesture(count: 2) { onCreate(template) }
-                                .onTapGesture { selection = template }
+                    VStack(alignment: .leading, spacing: 14) {
+                        ForEach(gridSections, id: \.title) { section in
+                            if gridSections.count > 1 { sectionHeader(section.title) }
+                            grid(section.templates)
                         }
                     }
                     .padding(28)
@@ -99,10 +103,83 @@ struct TemplateChooserView: View {
         .onKeyPress(.rightArrow) { moveSelection(by: 1) }
         .onKeyPress(.upArrow) { moveSelection(by: -3) }
         .onKeyPress(.downArrow) { moveSelection(by: 3) }
+        .onAppear { userTemplates.reload() }
+        .alert("Rename Template", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
+            TextField("Name", text: $newName)
+            Button("Rename") { if let template = renaming { rename(template) } }
+            Button("Cancel", role: .cancel) {}
+        }
+        .confirmationDialog(
+            "Delete the template “\(deleting?.name ?? "")”?",
+            isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } })
+        ) {
+            Button("Move to Trash", role: .destructive) { if let template = deleting { delete(template) } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Documents already created from it are not affected.")
+        }
+        .alert("Template Error", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(errorMessage ?? "")
+        }
+    }
+
+    /// User templates first, then the built-in ones; one untitled section when there are no user templates.
+    var gridSections: [(title: String, templates: [DocumentTemplate])] {
+        let user = userTemplates.templates
+        return (user.isEmpty ? [] : [("MY TEMPLATES", user)]) + [("BUILT-IN", TemplateLibrary.all)]
+    }
+
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(.secondary)
+    }
+
+    private func grid(_ templates: [DocumentTemplate]) -> some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150, maximum: 170), spacing: 22)], spacing: 22) {
+            ForEach(templates) { template in
+                TemplateCard(template: template, isSelected: template == selection)
+                    .onTapGesture(count: 2) { onCreate(template) }
+                    .onTapGesture { selection = template }
+                    .contextMenu {
+                        if template.isUserTemplate {
+                            Button("Rename…") {
+                                newName = template.name
+                                renaming = template
+                            }
+                            Button("Show in Finder") {
+                                if let url = template.fileURL { NSWorkspace.shared.activateFileViewerSelecting([url]) }
+                            }
+                            Divider()
+                            Button("Delete…") { deleting = template }
+                        }
+                    }
+            }
+        }
+    }
+
+    private func rename(_ template: DocumentTemplate) {
+        do {
+            let renamed = try userTemplates.rename(template, to: newName)
+            if selection == template { selection = renamed }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func delete(_ template: DocumentTemplate) {
+        do {
+            try userTemplates.delete(template)
+            if selection == template { selection = TemplateLibrary.blank }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     private func moveSelection(by offset: Int) -> KeyPress.Result {
-        let all = TemplateLibrary.all
+        let all = userTemplates.templates + TemplateLibrary.all
         guard let index = all.firstIndex(of: selection) else { return .ignored }
         selection = all[min(max(index + offset, 0), all.count - 1)]
         return .handled
