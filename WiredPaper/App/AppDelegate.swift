@@ -2,6 +2,7 @@ import AppKit
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let recentDocumentsMenu = RecentDocumentsMenuController()
+    private let iconAppearance = AppIconAppearance()
 
     /// True when the app is hosting unit tests: stay in the background and open no windows.
     static let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
@@ -18,6 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         if !Self.isRunningTests { UpdateChecker.shared.start() }
+        iconAppearance.start()
     }
 
     func applicationShouldOpenUntitledFile(_ sender: NSApplication) -> Bool {

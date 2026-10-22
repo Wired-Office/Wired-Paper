@@ -1,7 +1,8 @@
 #!/usr/bin/env swift
 // Renders the Wired Paper app icon: AppIcon.icon (Icon Composer format, with a
 // Dark Mode appearance, used on macOS 26+) and the asset catalog's
-// AppIcon.appiconset (the light icon, for macOS 14 and 15).
+// AppIcon.appiconset (the light icon, for macOS 14 and 15), plus the dark icon
+// as an image set (AppIconDark) that the app shows in the Dock in Dark Mode.
 // Usage: swift Scripts/generate-icon.swift [resources-directory]
 //
 // Design (matches LBrowser and Wired Grid): a white squircle, a dot-matrix
@@ -112,6 +113,18 @@ for entry in entries {
     images.append(["filename": name, "idiom": "mac", "scale": "\(entry.scale)x", "size": "\(entry.size)x\(entry.size)"])
 }
 try writeJSON(["images": images, "info": ["author": "xcode", "version": 1]], to: appIconSet.appendingPathComponent("Contents.json"))
+
+// The dark icon as a plain image, for switching the Dock icon at run time
+// (AppIconAppearance); macOS ignores dark appearances in an .appiconset.
+let darkImageSet = resourcesDirectory.appendingPathComponent("Assets.xcassets/AppIconDark.imageset")
+try FileManager.default.createDirectory(at: darkImageSet, withIntermediateDirectories: true)
+var darkImages: [[String: String]] = []
+for scale in [1, 2] {
+    let name = "icon_dark_512x512\(scale == 2 ? "@2x" : "").png"
+    try renderPNG(pixels: 512 * scale, palette: dark, tile: true).write(to: darkImageSet.appendingPathComponent(name))
+    darkImages.append(["filename": name, "idiom": "mac", "scale": "\(scale)x"])
+}
+try writeJSON(["images": darkImages, "info": ["author": "xcode", "version": 1]], to: darkImageSet.appendingPathComponent("Contents.json"))
 
 // The Icon Composer icon: a solid fill and one flat page layer, each with a dark specialization.
 let iconBundle = resourcesDirectory.appendingPathComponent("AppIcon.icon")
