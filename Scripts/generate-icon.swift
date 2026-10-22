@@ -1,17 +1,25 @@
 #!/usr/bin/env swift
-// Renders the Wired Paper app icon into the asset catalog.
-// Usage: swift Scripts/generate-icon.swift [output-directory]
+// Renders the Wired Paper app icon: AppIcon.icon (Icon Composer format, with a
+// Dark Mode appearance, used on macOS 26+) and the asset catalog's
+// AppIcon.appiconset (the light icon, for macOS 14 and 15).
+// Usage: swift Scripts/generate-icon.swift [resources-directory]
 //
 // Design (matches LBrowser and Wired Grid): a white squircle, a dot-matrix
 // page — folded corner, a heading and lines of text — and a single blue dot.
+// In Dark Mode the squircle is charcoal and the ink light.
 
 import AppKit
 
-let outputDirectory = URL(fileURLWithPath: CommandLine.arguments.count > 1
+let resourcesDirectory = URL(fileURLWithPath: CommandLine.arguments.count > 1
     ? CommandLine.arguments[1]
-    : "WiredPaper/Resources/Assets.xcassets/AppIcon.appiconset")
+    : "WiredPaper/Resources")
 
-let accent = CGColor(srgbRed: 0.184, green: 0.435, blue: 0.859, alpha: 1)
+struct Palette { let tile: CGColor; let border: CGColor; let ink: (r: CGFloat, g: CGFloat, b: CGFloat); let accent: CGColor }
+
+let light = Palette(tile: CGColor(gray: 0.996, alpha: 1), border: CGColor(gray: 0, alpha: 0.10),
+                    ink: (0.039, 0.039, 0.043), accent: CGColor(srgbRed: 0.184, green: 0.435, blue: 0.859, alpha: 1))
+let dark = Palette(tile: CGColor(srgbRed: 0.110, green: 0.110, blue: 0.118, alpha: 1), border: CGColor(gray: 1, alpha: 0.14),
+                   ink: (0.945, 0.945, 0.953), accent: CGColor(srgbRed: 0.290, green: 0.565, blue: 1.0, alpha: 1))
 
 /// Ink density (0…1) for the dot at lattice column `c` of `columns`, row `r` of `rows`.
 func density(_ c: Int, _ r: Int, _ columns: Int, _ rows: Int) -> Double {
@@ -33,17 +41,26 @@ func density(_ c: Int, _ r: Int, _ columns: Int, _ rows: Int) -> Double {
     return 0.02 + light * 0.12                                           // paper
 }
 
-func drawIcon(in ctx: CGContext, size: CGFloat) {
+/// Draws the icon on a 1024-point canvas. With `tile` the squircle is drawn too;
+/// without it the page fills the canvas, which Icon Composer masks and edges itself.
+func drawIcon(in ctx: CGContext, size: CGFloat, palette: Palette, tile drawsTile: Bool) {
     ctx.scaleBy(x: size / 1024, y: size / 1024)
 
-    let tile = CGPath(roundedRect: CGRect(x: 100, y: 100, width: 824, height: 824), cornerWidth: 185, cornerHeight: 185, transform: nil)
-    ctx.addPath(tile)
-    ctx.setFillColor(CGColor(gray: 0.996, alpha: 1))
-    ctx.fillPath()
-    ctx.addPath(tile)
-    ctx.setStrokeColor(CGColor(gray: 0, alpha: 0.10))
-    ctx.setLineWidth(4)
-    ctx.strokePath()
+    if drawsTile {
+        let tile = CGPath(roundedRect: CGRect(x: 100, y: 100, width: 824, height: 824), cornerWidth: 185, cornerHeight: 185, transform: nil)
+        ctx.addPath(tile)
+        ctx.setFillColor(palette.tile)
+        ctx.fillPath()
+        ctx.addPath(tile)
+        ctx.setStrokeColor(palette.border)
+        ctx.setLineWidth(4)
+        ctx.strokePath()
+    } else {
+        // Scale the 824-point tile's contents up to the full canvas.
+        ctx.translateBy(x: 512, y: 512)
+        ctx.scaleBy(x: 1024 / 824, y: 1024 / 824)
+        ctx.translateBy(x: -512, y: -512)
+    }
 
     // The dot matrix: square dots sized and shaded by density, on an exact lattice.
     let columns = 16, rows = 19
@@ -55,33 +72,64 @@ func drawIcon(in ctx: CGContext, size: CGFloat) {
             let h = density(c, r, columns, rows)
             guard h > 0 else { continue }
             let s = pitch * 0.66 * (0.25 + 0.75 * h)
-            ctx.setFillColor(CGColor(srgbRed: 0.039, green: 0.039, blue: 0.043, alpha: 0.2 + 0.8 * h))
+            ctx.setFillColor(CGColor(srgbRed: palette.ink.r, green: palette.ink.g, blue: palette.ink.b, alpha: 0.2 + 0.8 * h))
             ctx.fill(CGRect(x: originX + Double(c) * pitch - s / 2, y: top - Double(r) * pitch - s / 2, width: s, height: s))
         }
     }
 
-    ctx.setFillColor(accent)
+    ctx.setFillColor(palette.accent)
     ctx.fillEllipse(in: CGRect(x: 690, y: 700, width: 80, height: 80))
 }
 
-func renderPNG(pixels: Int) -> Data {
+func renderPNG(pixels: Int, palette: Palette, tile: Bool) -> Data {
     let ctx = CGContext(data: nil, width: pixels, height: pixels, bitsPerComponent: 8, bytesPerRow: 0,
                         space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
     ctx.interpolationQuality = .high
-    drawIcon(in: ctx, size: CGFloat(pixels))
+    drawIcon(in: ctx, size: CGFloat(pixels), palette: palette, tile: tile)
     return NSBitmapImageRep(cgImage: ctx.makeImage()!).representation(using: .png, properties: [:])!
 }
 
+func writeJSON(_ object: [String: Any], to url: URL) throws {
+    try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys]).write(to: url)
+}
+
+func srgb(_ color: CGColor) -> String {
+    let c = color.converted(to: CGColorSpace(name: CGColorSpace.sRGB)!, intent: .defaultIntent, options: nil)!.components!
+    let rgba = c.count == 2 ? [c[0], c[0], c[0], c[1]] : c
+    return "srgb:" + rgba.map { String(format: "%.5f", Double($0)) }.joined(separator: ",")
+}
+
+// The asset catalog: the light icon at every Mac size.
 struct Entry { let size: Int; let scale: Int }
 let entries = [16, 32, 128, 256, 512].flatMap { [Entry(size: $0, scale: 1), Entry(size: $0, scale: 2)] }
 
-try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
+let appIconSet = resourcesDirectory.appendingPathComponent("Assets.xcassets/AppIcon.appiconset")
+try FileManager.default.createDirectory(at: appIconSet, withIntermediateDirectories: true)
 var images: [[String: String]] = []
 for entry in entries {
     let name = "icon_\(entry.size)x\(entry.size)\(entry.scale == 2 ? "@2x" : "").png"
-    try renderPNG(pixels: entry.size * entry.scale).write(to: outputDirectory.appendingPathComponent(name))
+    try renderPNG(pixels: entry.size * entry.scale, palette: light, tile: true).write(to: appIconSet.appendingPathComponent(name))
     images.append(["filename": name, "idiom": "mac", "scale": "\(entry.scale)x", "size": "\(entry.size)x\(entry.size)"])
 }
-let contents: [String: Any] = ["images": images, "info": ["author": "xcode", "version": 1]]
-try JSONSerialization.data(withJSONObject: contents, options: [.prettyPrinted, .sortedKeys]).write(to: outputDirectory.appendingPathComponent("Contents.json"))
-print("Wrote \(entries.count) icon images to \(outputDirectory.path)")
+try writeJSON(["images": images, "info": ["author": "xcode", "version": 1]], to: appIconSet.appendingPathComponent("Contents.json"))
+
+// The Icon Composer icon: a solid fill and one flat page layer, each with a dark specialization.
+let iconBundle = resourcesDirectory.appendingPathComponent("AppIcon.icon")
+let iconAssets = iconBundle.appendingPathComponent("Assets")
+try FileManager.default.createDirectory(at: iconAssets, withIntermediateDirectories: true)
+try renderPNG(pixels: 1024, palette: light, tile: false).write(to: iconAssets.appendingPathComponent("page.png"))
+try renderPNG(pixels: 1024, palette: dark, tile: false).write(to: iconAssets.appendingPathComponent("page_dark.png"))
+let layer: [String: Any] = [
+    "name": "page",
+    "glass": false,
+    // A base "image-name" would win over the dark specialization.
+    "image-name-specializations": [["value": "page.png"], ["appearance": "dark", "value": "page_dark.png"],
+                                   ["appearance": "tinted", "value": "page_dark.png"]],
+]
+let icon: [String: Any] = [
+    "fill-specializations": [["value": ["solid": srgb(light.tile)]], ["appearance": "dark", "value": ["solid": srgb(dark.tile)]]],
+    "groups": [["layers": [layer], "shadow": ["kind": "none", "opacity": 0.5], "translucency": ["enabled": false, "value": 0.5]]],
+    "supported-platforms": ["squares": ["macOS"]],
+]
+try writeJSON(icon, to: iconBundle.appendingPathComponent("icon.json"))
+print("Wrote \(entries.count) icon images to \(appIconSet.path) and the light and dark icon to \(iconBundle.path)")
