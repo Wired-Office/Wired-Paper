@@ -117,6 +117,9 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         if let format = document.format, !format.isNative {
             parts.append(format.shortName)
         }
+        if document.fileURL == nil, let imported = document.importedFormat {
+            parts.append("Imported from \(imported.shortName)")
+        }
         // AppKit appends "— Edited" itself while there are unsaved changes.
         if document.fileURL == nil {
             parts.append("Not saved")

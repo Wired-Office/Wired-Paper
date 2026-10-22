@@ -13,7 +13,12 @@ enum DocumentFormat: String, CaseIterable, Identifiable {
     case odt = "org.oasis-open.opendocument.text"
     case html = "public.html"
     case plainText = "public.plain-text"
+    case markdown = "net.daringfireball.markdown"
+    case wordDoc = "com.microsoft.word.doc"
+    case webArchive = "com.apple.webarchive"
     case pdf = "com.adobe.pdf"
+    /// Apple Pages. Read-only: Wired Paper imports the text and saves elsewhere.
+    case pages = "com.apple.iwork.pages.sffpages"
 
     var id: String { rawValue }
     var typeIdentifier: String { rawValue }
@@ -28,7 +33,11 @@ enum DocumentFormat: String, CaseIterable, Identifiable {
         case .odt: UTType(rawValue) ?? UTType(filenameExtension: "odt") ?? .data
         case .html: .html
         case .plainText: .plainText
+        case .markdown: UTType(rawValue) ?? UTType(filenameExtension: "md") ?? .plainText
+        case .wordDoc: UTType(rawValue) ?? UTType(filenameExtension: "doc") ?? .data
+        case .webArchive: UTType(rawValue) ?? UTType(filenameExtension: "webarchive") ?? .data
         case .pdf: .pdf
+        case .pages: UTType(rawValue) ?? UTType(filenameExtension: "pages") ?? .data
         }
     }
 
@@ -42,7 +51,11 @@ enum DocumentFormat: String, CaseIterable, Identifiable {
         case .odt: "OpenDocument Text (.odt)"
         case .html: "Web Page (.html)"
         case .plainText: "Plain Text (.txt)"
+        case .markdown: "Markdown (.md)"
+        case .wordDoc: "Word 97–2004 Document (.doc)"
+        case .webArchive: "Web Archive (.webarchive)"
         case .pdf: "PDF"
+        case .pages: "Pages Document (.pages)"
         }
     }
 
@@ -57,7 +70,11 @@ enum DocumentFormat: String, CaseIterable, Identifiable {
         case .odt: "OpenDocument"
         case .html: "HTML"
         case .plainText: "Plain Text"
+        case .markdown: "Markdown"
+        case .wordDoc: "Word 97–2004"
+        case .webArchive: "Web Archive"
         case .pdf: "PDF"
+        case .pages: "Pages"
         }
     }
 
@@ -71,12 +88,20 @@ enum DocumentFormat: String, CaseIterable, Identifiable {
         case .odt: "odt"
         case .html: "html"
         case .plainText: "txt"
+        case .markdown: "md"
+        case .wordDoc: "doc"
+        case .webArchive: "webarchive"
         case .pdf: "pdf"
+        case .pages: "pages"
         }
     }
 
     /// Formats that store everything Wired Paper knows about a document.
     var isNative: Bool { self == .paper || self == .wiredPaper }
+
+    /// Formats Wired Paper reads but can't write back. Opening one imports its
+    /// text into a new untitled document, so saving never touches the original.
+    var isImportOnly: Bool { self == .pdf || self == .pages }
 
     /// Whether saving in this format can drop content (images, tables, styles…).
     var isLossy: Bool {
@@ -87,7 +112,7 @@ enum DocumentFormat: String, CaseIterable, Identifiable {
     }
 
     /// Formats offered by File ▸ Export…, in menu order.
-    static let exportFormats: [DocumentFormat] = [.pdf, .docx, .paper, .rtf, .rtfd, .odt, .html, .plainText, .wiredPaper]
+    static let exportFormats: [DocumentFormat] = [.pdf, .docx, .paper, .rtf, .rtfd, .odt, .html, .markdown, .plainText, .wiredPaper]
 
     /// Resolves a type name handed to us by NSDocument (usually a UTI, possibly a
     /// more specific subtype such as public.utf8-plain-text).
@@ -96,10 +121,24 @@ enum DocumentFormat: String, CaseIterable, Identifiable {
             self = exact
             return
         }
+        // Pages has used several type identifiers (package, single file, '09);
+        // some are unknown on Macs without Pages.
+        if typeName.hasPrefix("com.apple.iwork.pages") {
+            self = .pages
+            return
+        }
         guard let type = UTType(typeName) else { return nil }
         // Check the specific formats before the generic plain-text family.
-        let ordered: [DocumentFormat] = [.paper, .wiredPaper, .rtfd, .rtf, .docx, .odt, .html, .pdf, .plainText]
-        guard let match = ordered.first(where: { type.conforms(to: $0.utType) }) else { return nil }
-        self = match
+        let ordered: [DocumentFormat] = [.paper, .wiredPaper, .rtfd, .rtf, .docx, .wordDoc, .odt, .html, .webArchive, .pdf, .pages, .markdown, .plainText]
+        if let match = ordered.first(where: { type.conforms(to: $0.utType) }) {
+            self = match
+        } else if type.preferredFilenameExtension.map({ ["md", "markdown", "mdown", "mkd"].contains($0) }) == true {
+            self = .markdown
+        } else if type.conforms(to: .text) || type.conforms(to: .sourceCode) {
+            // Any other text-based file (JSON, XML, CSV, YAML, logs, source code…) opens as plain text.
+            self = .plainText
+        } else {
+            return nil
+        }
     }
 }

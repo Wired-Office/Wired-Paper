@@ -22,10 +22,13 @@ enum DocumentCodecRegistry {
         case .docx: CocoaTextCodec(documentType: .officeOpenXML)
         case .odt: CocoaTextCodec(documentType: .openDocument)
         case .html: CocoaTextCodec(documentType: .html)
+        case .wordDoc: CocoaTextCodec(documentType: .docFormat)
+        case .webArchive: CocoaTextCodec(documentType: .webArchive)
         case .plainText: PlainTextCodec()
-        case .pdf:
-            // PDF is export-only and produced by the print system (see PDFExporter).
-            throw WiredPaperError.unsupportedFormat(format.displayName)
+        case .markdown: MarkdownCodec()
+        // Exported PDFs come from the print system (see PDFExporter); this codec only reads.
+        case .pdf: PDFTextCodec()
+        case .pages: PagesTextCodec()
         }
     }
 }

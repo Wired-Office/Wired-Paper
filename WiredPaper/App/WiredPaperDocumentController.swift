@@ -15,6 +15,19 @@ final class WiredPaperDocumentController: NSDocumentController {
         }
     }
 
+    /// PDF and Pages files can't be written back, so they open as untitled
+    /// documents holding their text; saving asks where to put the new file.
+    override func makeDocument(withContentsOf url: URL, ofType typeName: String) throws -> NSDocument {
+        guard let format = DocumentFormat(typeName: typeName), format.isImportOnly else {
+            return try super.makeDocument(withContentsOf: url, ofType: typeName)
+        }
+        let document = try makeUntitledDocument(ofType: DocumentFormat.paper.typeIdentifier)
+        guard let document = document as? WiredPaperDocument else { return document }
+        try document.importContents(of: url, format: format)
+        noteNewRecentDocumentURL(url)
+        return document
+    }
+
     /// Opens a new untitled document holding generated content.
     @discardableResult
     func newDocument(text: NSAttributedString, pageSetup: PageSetup, metadata: DocumentMetadata = DocumentMetadata()) -> WiredPaperDocument? {

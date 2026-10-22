@@ -39,6 +39,16 @@ final class WiredPaperDocument: NSDocument, ObservableObject {
         fileType.flatMap(DocumentFormat.init(typeName:))
     }
 
+    /// The read-only format (PDF, Pages) this untitled document was imported from.
+    private(set) var importedFormat: DocumentFormat?
+    private var importedName: String?
+
+    /// Imported documents keep the original's name until they're saved.
+    override var displayName: String! {
+        get { fileURL == nil ? importedName ?? super.displayName : super.displayName }
+        set { super.displayName = newValue }
+    }
+
     var editor: EditorController? {
         windowControllers.lazy.compactMap { ($0 as? DocumentWindowController)?.editor }.first
     }
@@ -127,6 +137,14 @@ final class WiredPaperDocument: NSDocument, ObservableObject {
         let codec = try DocumentCodecRegistry.codec(for: format)
         let contents = try codec.read(from: fileWrapper, defaultAttributes: StyleCatalog.attributes(for: .normal))
         apply(contents)
+    }
+
+    /// Reads a file of a format that can't be saved back into this untitled document.
+    func importContents(of url: URL, format: DocumentFormat) throws {
+        let wrapper = try FileWrapper(url: url, options: .immediate)
+        try read(from: wrapper, ofType: format.typeIdentifier)
+        importedFormat = format
+        importedName = url.deletingPathExtension().lastPathComponent
     }
 
     private func apply(_ contents: DocumentContents) {
